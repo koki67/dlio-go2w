@@ -1,0 +1,12 @@
+common:
+  default_window: reconstruct
+
+parameters:
+  # Set this to the raw sensor bag directory, e.g.:
+  #   bag: /external/bags/raw_20250301_143022
+  bag: /external/bags/REPLACE_WITH_BAG_NAME
+
+windows:
+  - commands:
+      - "bash /external/scripts/dlio/reconstruct_raw.sh ${bag}"
+    name: reconstruct

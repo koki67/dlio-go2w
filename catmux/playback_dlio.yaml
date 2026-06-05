@@ -1,0 +1,24 @@
+common:
+  default_window: rviz2
+
+parameters:
+  source: /external/humble_ws/install/setup.bash
+  unitree_ros2: /external/humble_ws/src/unitree_ros2/setup.sh
+  rviz_cfg: /external/config/dlio/dlio.rviz
+  # Set this to the bag directory you want to play back, e.g.:
+  #   bag: /external/bags/dlio_20250301_143022
+  bag: /external/bags/REPLACE_WITH_BAG_NAME
+
+windows:
+  - commands:
+      - source ${source}
+      - source ${unitree_ros2}
+      - "ros2 bag play ${bag} --clock"
+    name: bag_play
+
+  - commands:
+      - source ${source}
+      - source ${unitree_ros2}
+      - sleep 2
+      - "rviz2 -d ${rviz_cfg}"
+    name: rviz2

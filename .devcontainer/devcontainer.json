@@ -1,0 +1,34 @@
+{
+  // Desktop bag playback and D-LIO reconstruction environment (amd64).
+  // For the robot-side D-LIO stack, use docker/robot/run.sh instead.
+  "name": "D-LIO GO2-W Desktop",
+
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+
+  "containerEnv": {
+    // Forward the host X11 display so rviz2 renders on your desktop screen.
+    // Linux only — see README for macOS / Windows notes.
+    "DISPLAY": "${localEnv:DISPLAY}",
+    // Prevents Qt rendering artifacts in Docker.
+    "QT_X11_NO_MITSHM": "1"
+  },
+
+  // Host networking is the simplest way to let ros2 bag play and rviz2
+  // discover each other via DDS without extra configuration.
+  "runArgs": ["--net=host"],
+
+  // Mount the host X11 socket so the container can open GUI windows.
+  "mounts": [
+    "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind,consistency=cached"
+  ],
+
+  // Install desktop-only build dependencies and build the D-LIO package once.
+  "postCreateCommand": "bash .devcontainer/postCreate.sh",
+
+  // Re-apply safe.directory when the workspace is mounted into a fresh container.
+  "postStartCommand": "bash .devcontainer/configure_git_safe_directory.sh"
+
+}

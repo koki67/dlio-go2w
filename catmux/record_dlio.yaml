@@ -1,0 +1,32 @@
+common:
+  default_window: bag_record
+
+parameters:
+  source: /external/humble_ws/install/setup.bash
+  unitree_ros2: /external/humble_ws/src/unitree_ros2/setup.sh
+
+windows:
+  - commands:
+      - source ${source}
+      - source ${unitree_ros2}
+      - ros2 run go2w_imu_publisher imu_publisher
+    name: imu_publisher
+
+  - commands:
+      - source ${source}
+      - source ${unitree_ros2}
+      - ros2 launch hesai_lidar hesai_lidar_launch.py
+    name: hesai_lidar_node
+
+  - commands:
+      - source ${source}
+      - source ${unitree_ros2}
+      - ros2 launch direct_lidar_inertial_odometry dlio.launch.py
+    name: dlio
+
+  - commands:
+      - source ${source}
+      - source ${unitree_ros2}
+      - sleep 5
+      - "ros2 bag record -o /external/bags/dlio_$(date +%Y%m%d_%H%M%S) /dlio/odom_node/odom /dlio/odom_node/path /dlio/odom_node/keyframes /dlio/odom_node/pointcloud/deskewed /map /tf /tf_static"
+    name: bag_record
