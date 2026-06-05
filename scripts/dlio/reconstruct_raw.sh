@@ -161,6 +161,7 @@ echo ""
 
 ros2 launch direct_lidar_inertial_odometry dlio.launch.py \
     rviz:=false \
+    launch_drivers:=false \
     use_sim_time:=true \
     pointcloud_topic:=points_raw \
     imu_topic:=go2w/imu &
