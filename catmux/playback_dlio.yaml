@@ -20,5 +20,5 @@ windows:
       - source ${source}
       - source ${unitree_ros2}
       - sleep 2
-      - "rviz2 -d ${rviz_cfg}"
+      - "rviz2 -d ${rviz_cfg} --ros-args -p use_sim_time:=true"
     name: rviz2

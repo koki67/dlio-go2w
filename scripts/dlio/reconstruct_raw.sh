@@ -175,10 +175,10 @@ if ! kill -0 "$DLIO_PID" 2>/dev/null; then
 fi
 
 # Reset D-LIO state before playback to clear any leftover data from previous runs.
-# --timeout prevents hanging indefinitely if a node didn't come up cleanly.
+# timeout prevents hanging indefinitely if a node didn't come up cleanly.
 echo "Resetting D-LIO node state..."
-ros2 service call /dlio_odom_node/reset_map direct_lidar_inertial_odometry/srv/ResetMap --timeout 5 || true
-ros2 service call /dlio_map_node/reset_map direct_lidar_inertial_odometry/srv/ResetMap --timeout 5 || true
+timeout 5 ros2 service call /dlio_odom_node/reset_map direct_lidar_inertial_odometry/srv/ResetMap || true
+timeout 5 ros2 service call /dlio_map_node/reset_map direct_lidar_inertial_odometry/srv/ResetMap || true
 
 ros2 bag play "$BAG" "${CLOCK_ARG[@]}" "${EXTRA_ARGS[@]}" &
 BAG_PID=$!
