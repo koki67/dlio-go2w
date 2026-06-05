@@ -24,6 +24,8 @@ RUN apt update -q && \
     python3-rosdep python3-vcstool
     
 RUN apt-get update && apt-get install -y net-tools \
+    build-essential \
+    cmake \
     iputils-ping \
     snapd \
     git \
