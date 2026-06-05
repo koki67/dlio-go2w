@@ -1,2 +1,10 @@
 bags/*
 !bags/.gitkeep
+
+humble_ws/build/
+humble_ws/install/
+humble_ws/log/
+
+.devcontainer/offline_dlio/build/
+.devcontainer/offline_dlio/install/
+.devcontainer/offline_dlio/log/
