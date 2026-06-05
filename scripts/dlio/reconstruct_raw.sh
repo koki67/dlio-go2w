@@ -98,19 +98,31 @@ if ! ros2 pkg prefix direct_lidar_inertial_odometry >/dev/null 2>&1; then
     exit 1
 fi
 
+terminate_process_group() {
+    local signal="$1"
+    local pgid="${2:-}"
+    if [ -n "$pgid" ]; then
+        kill -"$signal" -- "-$pgid" 2>/dev/null || true
+    fi
+}
+
+is_process_group_alive() {
+    local pgid="${1:-}"
+    [ -n "$pgid" ] && kill -0 -- "-$pgid" 2>/dev/null
+}
+
 cleanup() {
     echo "Stopping raw-bag D-LIO reconstruction..."
-    # SIGINT first so ros2 launch can propagate a graceful shutdown to its children.
-    for pid in "${BAG_PID:-}" "${DLIO_PID:-}"; do
-        if [ -n "${pid:-}" ]; then
-            kill -INT "$pid" 2>/dev/null || true
-        fi
+    # Each background ROS command is launched in its own process group. Signal only
+    # those groups so unrelated D-LIO sessions in the same container are not touched.
+    for pgid in "${BAG_PGID:-}" "${DLIO_PGID:-}"; do
+        terminate_process_group INT "$pgid"
     done
-    # Wait up to 5 seconds for graceful exit.
+
     for _ in 1 2 3 4 5; do
         local any_alive=0
-        for pid in "${BAG_PID:-}" "${DLIO_PID:-}"; do
-            if [ -n "${pid:-}" ] && kill -0 "$pid" 2>/dev/null; then
+        for pgid in "${BAG_PGID:-}" "${DLIO_PGID:-}"; do
+            if is_process_group_alive "$pgid"; then
                 any_alive=1
                 break
             fi
@@ -118,40 +130,19 @@ cleanup() {
         [ "$any_alive" -eq 0 ] && break
         sleep 1
     done
-    # Force-kill any direct child still alive.
+
+    for pgid in "${BAG_PGID:-}" "${DLIO_PGID:-}"; do
+        terminate_process_group KILL "$pgid"
+    done
+
     for pid in "${BAG_PID:-}" "${DLIO_PID:-}"; do
-        if [ -n "${pid:-}" ] && kill -0 "$pid" 2>/dev/null; then
-            kill -KILL "$pid" 2>/dev/null || true
-        fi
         if [ -n "${pid:-}" ]; then
             wait "$pid" 2>/dev/null || true
         fi
     done
-    # ros2 launch sometimes orphans its node children on SIGTERM/quick exit;
-    # without this, leftover dlio_*_node processes keep publishing the previous
-    # run's accumulated map and corrupt the next reconstruction.
-    pkill -KILL -x dlio_odom_node 2>/dev/null || true
-    pkill -KILL -x dlio_map_node 2>/dev/null || true
 }
 
 trap cleanup EXIT INT TERM
-
-# Defensive sweep: if a previous invocation orphaned D-LIO nodes (e.g., the shell
-# was killed before its EXIT trap could run), clear them out before launching.
-if pgrep -x dlio_odom_node >/dev/null 2>&1 || pgrep -x dlio_map_node >/dev/null 2>&1; then
-    echo "Found leftover D-LIO nodes from a previous run; terminating them..."
-    pkill -INT -x dlio_odom_node 2>/dev/null || true
-    pkill -INT -x dlio_map_node 2>/dev/null || true
-    for _ in 1 2 3; do
-        if ! pgrep -x dlio_odom_node >/dev/null 2>&1 \
-            && ! pgrep -x dlio_map_node >/dev/null 2>&1; then
-            break
-        fi
-        sleep 1
-    done
-    pkill -KILL -x dlio_odom_node 2>/dev/null || true
-    pkill -KILL -x dlio_map_node 2>/dev/null || true
-fi
 
 echo "Bag:  $BAG"
 echo "RViz: $RVIZ_CFG"
@@ -159,13 +150,14 @@ echo "D-LIO setup: $WS_SETUP"
 echo "Mode: replay raw topics, run D-LIO offline, visualize generated outputs"
 echo ""
 
-ros2 launch direct_lidar_inertial_odometry dlio.launch.py \
+setsid ros2 launch direct_lidar_inertial_odometry dlio.launch.py \
     rviz:=false \
     launch_drivers:=false \
     use_sim_time:=true \
     pointcloud_topic:=points_raw \
     imu_topic:=go2w/imu &
 DLIO_PID=$!
+DLIO_PGID=$DLIO_PID
 
 sleep 3
 if ! kill -0 "$DLIO_PID" 2>/dev/null; then
@@ -180,8 +172,9 @@ echo "Resetting D-LIO node state..."
 timeout 5 ros2 service call /dlio_odom_node/reset_map direct_lidar_inertial_odometry/srv/ResetMap || true
 timeout 5 ros2 service call /dlio_map_node/reset_map direct_lidar_inertial_odometry/srv/ResetMap || true
 
-ros2 bag play "$BAG" "${CLOCK_ARG[@]}" "${EXTRA_ARGS[@]}" &
+setsid ros2 bag play "$BAG" "${CLOCK_ARG[@]}" "${EXTRA_ARGS[@]}" &
 BAG_PID=$!
+BAG_PGID=$BAG_PID
 
 sleep 2
 if ! kill -0 "$BAG_PID" 2>/dev/null; then
