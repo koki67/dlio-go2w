@@ -21,7 +21,7 @@ windows:
   - commands:
       - source ${source}
       - source ${unitree_ros2}
-      - ros2 launch direct_lidar_inertial_odometry dlio.launch.py
+      - ros2 launch direct_lidar_inertial_odometry dlio.launch.py launch_drivers:=false
     name: dlio
 
   - commands:
