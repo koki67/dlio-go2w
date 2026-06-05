@@ -1,0 +1,59 @@
+# GO2-W Sensor Calibration Reference
+#
+# This file is the single source of truth for sensor calibration values
+# used across all SLAM algorithms. Algorithm-specific configs (D-LIO's
+# cfg/dlio.yaml, GLIM's config_sensors.json) contain their own copies
+# in native formats — verify consistency against this file.
+#
+# Robot: Unitree GO2-W
+# LiDAR: Hesai PandarXT-16
+# IMU: Built-in GO2-W IMU (from lowstate)
+
+# --- Frame names ---
+frames:
+  imu: imu_link
+  lidar: hesai_lidar
+  base_link: base_link
+  odom: odom
+
+# --- Topics ---
+topics:
+  imu: /go2w/imu
+  lidar: /points_raw
+
+# --- Extrinsic calibration: base_link -> LiDAR ---
+# The PandarXT-16 native frame is rotated +90 deg around Z from REP-103:
+#   LiDAR X = Robot Left, LiDAR Y = Robot Backward, LiDAR Z = Robot Up
+# Rz(+90) rotates LiDAR-frame vectors into base_link (REP-103).
+T_baselink_lidar:
+  translation: [0.1634, 0.0, 0.116]
+  rotation_quaternion: [0.0, 0.0, 0.7071068, 0.7071068]  # [x, y, z, w]
+
+# --- Extrinsic calibration: base_link -> IMU ---
+# The Go2W IMU body frame is rotated +90 deg around Z from the robot body:
+#   IMU X = Robot Left, IMU Y = Robot Backward, IMU Z = Robot Up
+# Rz(+90) rotates IMU-frame vectors into base_link (REP-103).
+T_baselink_imu:
+  translation: [0.0, 0.0, 0.0]
+  rotation_quaternion: [0.0, 0.0, 0.7071068, 0.7071068]  # [x, y, z, w]
+
+# --- IMU noise parameters ---
+imu_noise:
+  accelerometer: 0.05
+  gyroscope: 0.02
+  integration: 0.001
+  bias: 1.0e-5
+
+# --- LiDAR parameters ---
+lidar:
+  model: PandarXT-16
+  ip: 192.168.123.20
+  port: 2368
+
+# --- GLIM-specific timing ---
+# GLIM consumes T_lidar_imu directly in config_sensors.json, so any extrinsic
+# update there should be validated with an offline run instead of copied blindly
+# from the D-LIO/body-frame representation.
+glim:
+  imu_time_offset: -0.005  # evidence-based default from timing sweeps
+  points_time_offset: 0.0
