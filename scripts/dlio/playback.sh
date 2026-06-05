@@ -116,4 +116,4 @@ trap "echo 'Stopping bag player...'; kill $BAG_PID 2>/dev/null; wait $BAG_PID 2>
 sleep 2
 
 # Run RViz2 in the foreground; the script ends when the window is closed.
-rviz2 -d "$RVIZ_CFG"
+rviz2 -d "$RVIZ_CFG" --ros-args -p use_sim_time:=true
