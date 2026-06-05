@@ -20,8 +20,8 @@ ROS_SETUP="/opt/ros/humble/setup.bash"
 RVIZ_CFG="$REPO_ROOT/config/dlio/dlio.rviz"
 WS_SETUP=""
 WS_SETUP_CANDIDATES=(
-    "$REPO_ROOT/.devcontainer/offline_dlio/install/setup.bash"
     "$REPO_ROOT/humble_ws/install/setup.bash"
+    "$REPO_ROOT/.devcontainer/offline_dlio/install/setup.bash"
 )
 
 if [ ! -d "$BAG" ] && [ -d "$REPO_ROOT/$BAG" ]; then
