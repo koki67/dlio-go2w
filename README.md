@@ -43,7 +43,16 @@ dlio-go2w/
 
 Clone with submodules:
 ```bash
-git clone --recurse-submodules https://github.com/koki67/dlio-go2w.git
+git clone --recurse-submodules git@github.com:koki67/dlio-go2w.git
+```
+
+Private-submodule setup (private repos):
+- Ensure your GitHub SSH key is configured in your account and loaded in the agent.
+- Clone and initialize submodules:
+
+```bash
+git submodule sync --recursive
+git submodule update --init --recursive
 ```
 
 ## Setup
