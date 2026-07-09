@@ -12,5 +12,5 @@
 	branch = main
 [submodule "humble_ws/src/go2w-hesai-lidar-driver"]
 	path = humble_ws/src/go2w-hesai-lidar-driver
-	url = git.com:koki67/go2w-hesai-lidar-driver.git
+	url = https://github.com/koki67/go2w-hesai-lidar-driver.git
 	branch = main
