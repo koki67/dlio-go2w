@@ -11,6 +11,7 @@
   - [Desktop live RViz over WiFi](#desktop-live-rviz-over-wifi)
 - [Quick start: Record D-LIO outputs (on robot)](#quick-start-record-d-lio-outputs-on-robot)
 - [Quick start: Record raw sensor data (on robot)](#quick-start-record-raw-sensor-data-on-robot)
+- [Quick start: Diagnose raw bag timestamps](#quick-start-diagnose-raw-bag-timestamps)
 - [Quick start: Replay D-LIO outputs (on robot or desktop)](#quick-start-replay-d-lio-outputs-on-robot-or-desktop)
 - [Quick start: Reconstruct D-LIO from raw bag (on robot or desktop)](#quick-start-reconstruct-d-lio-from-raw-bag-on-robot-or-desktop)
 - [Quick start: Diagnose TF (on desktop)](#quick-start-diagnose-tf-on-desktop)
@@ -41,7 +42,7 @@ dlio-go2w/
 ├── .devcontainer/                       Desktop devcontainer (amd64, bag replay + reconstruction)
 ├── catmux/                              Robot-side tmux session definitions
 ├── scripts/dlio/                        Desktop offline scripts
-├── scripts/diagnosis/                   TF validation helpers
+├── scripts/diagnosis/                   TF and timestamp validation helpers
 ├── config/
 │   ├── dlio/                            RViz config
 │   └── sensor/                          Shared sensor calibration reference
@@ -144,6 +145,35 @@ catmux_create_session /external/catmux/record_raw.yaml
 ```
 
 Bags are saved to `/external/bags/raw_YYYYMMDD_HHMMSS`.
+
+## Quick start: Diagnose raw bag timestamps
+
+Use this after recording a `raw_` bag to inspect whether the GO2-W IMU and Hesai LiDAR timestamps are usable for D-LIO. The script reads the rosbag2 files directly; it does not run `ros2 bag play`, start D-LIO, or open RViz.
+
+The default topics match `catmux/record_raw.yaml`:
+- `/go2w/imu` from `go2w-imu-publisher`
+- `/points_raw` from `go2w-hesai-lidar-driver`
+
+Run it after sourcing ROS 2:
+```bash
+cd /home/user/ws/dlio-go2w
+source /opt/ros/humble/setup.bash
+python3 scripts/diagnosis/check_raw_bag_timestamps.py /external/bags/raw_YYYYMMDD_HHMMSS
+```
+
+Optional JSON output:
+```bash
+python3 scripts/diagnosis/check_raw_bag_timestamps.py /external/bags/raw_YYYYMMDD_HHMMSS --json timing_report.json
+```
+
+The report includes:
+- message counts and time ranges for both topics
+- `header.stamp` monotonicity, duplicate stamps, and estimated rates
+- `bag_record_time - header.stamp`, which shows recording/transport delay from the bag's point of view
+- nearest IMU sample gaps for each LiDAR frame
+- Hesai `PointCloud2` per-point `timestamp` field checks used by D-LIO deskewing
+
+This is an observation tool, not a pass/fail gate. Use the output to decide whether the IMU and LiDAR streams overlap in time, whether IMU stamps are monotonic, and whether a fixed LiDAR/IMU time offset should be estimated before offline reconstruction.
 
 ## Quick start: Replay D-LIO outputs (on robot or desktop)
 
