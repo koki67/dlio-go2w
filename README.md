@@ -1,5 +1,22 @@
 # dlio-go2w
 
+## Table of contents
+
+- [Attribution](#attribution)
+- [Repository layout](#repository-layout)
+- [Submodules](#submodules)
+- [Setup](#setup)
+- [Bag types](#bag-types)
+- [Quick start: Online D-LIO (on robot)](#quick-start-online-d-lio-on-robot)
+  - [Desktop live RViz over WiFi](#desktop-live-rviz-over-wifi)
+- [Quick start: Record D-LIO outputs (on robot)](#quick-start-record-d-lio-outputs-on-robot)
+- [Quick start: Record raw sensor data (on robot)](#quick-start-record-raw-sensor-data-on-robot)
+- [Quick start: Replay D-LIO outputs (on robot or desktop)](#quick-start-replay-d-lio-outputs-on-robot-or-desktop)
+- [Quick start: Reconstruct D-LIO from raw bag (on robot or desktop)](#quick-start-reconstruct-d-lio-from-raw-bag-on-robot-or-desktop)
+- [Quick start: Diagnose TF (on desktop)](#quick-start-diagnose-tf-on-desktop)
+- [Catmux sessions](#catmux-sessions)
+- [License](#license)
+
 ROS 2 workspace for running **Direct LiDAR-Inertial Odometry (D-LIO)** on the Unitree GO2-W robot with a Hesai PandarXT-16 LiDAR.
 
 ## Attribution
