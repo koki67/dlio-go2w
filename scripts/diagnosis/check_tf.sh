@@ -2,7 +2,7 @@
 # Launch D-LIO TF visualization for validating GO2-W sensor extrinsics.
 #
 # Usage:
-#   bash scripts/dlio/check_tf.sh [--rviz false|true]
+#   bash scripts/diagnosis/check_tf.sh [--rviz false|true]
 
 set -euo pipefail
 
@@ -51,7 +51,7 @@ while [ "$#" -gt 0 ]; do
             ;;
         *)
             echo "Error: unknown argument: $1" >&2
-            echo "Usage: bash scripts/dlio/check_tf.sh [--rviz false|true]" >&2
+            echo "Usage: bash scripts/diagnosis/check_tf.sh [--rviz false|true]" >&2
             exit 1
             ;;
     esac
