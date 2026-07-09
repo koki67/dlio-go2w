@@ -24,6 +24,7 @@ dlio-go2w/
 ├── .devcontainer/                       Desktop devcontainer (amd64, bag replay + reconstruction)
 ├── catmux/                              Robot-side tmux session definitions
 ├── scripts/dlio/                        Desktop offline scripts
+├── scripts/diagnosis/                   TF validation helpers
 ├── config/
 │   ├── dlio/                            RViz config
 │   └── sensor/                          Shared sensor calibration reference
@@ -154,6 +155,25 @@ catmux_create_session /external/catmux/reconstruct_raw_dlio.yaml
 ```bash
 bash scripts/dlio/reconstruct_raw.sh bags/raw_YYYYMMDD_HHMMSS
 ```
+
+## Quick start: Diagnose TF (on desktop)
+
+`check_tf.sh` is a lightweight TF-only check for D-LIO frame alignment and extrinsics sanity.
+
+It launches two static transforms from `dlio.yaml` parameters:
+- `baselink` → `imu_link`
+- `baselink` → `hesai_lidar`
+and optional RViz visualization (`direct_lidar_inertial_odometry` check_tf config) to inspect the TF tree, including `/tf` and `/tf_static`.
+
+Use it to catch broken/extrinsics-misconfigured calibrations before live runs.
+
+```bash
+bash scripts/diagnosis/check_tf.sh [--rviz false|true]
+```
+
+Flags:
+- `--rviz true` (default): launch RViz for interactive frame inspection
+- `--rviz false`: headless mode for CLI-only checks
 
 ## Catmux sessions
 
