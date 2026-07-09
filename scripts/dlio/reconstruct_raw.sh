@@ -2,27 +2,104 @@
 # Reconstruct D-LIO outputs from a raw sensor bag and open RViz2.
 #
 # Usage (from anywhere inside the repository):
-#   bash scripts/dlio/reconstruct_raw.sh <bag_directory> [ros2 bag play args...]
+#   bash scripts/dlio/reconstruct_raw.sh [--tf-profile legacy|urdf-imu] <bag_directory> [ros2 bag play args...]
 #
 # Examples:
-#   bash scripts/dlio/reconstruct_raw.sh humble_ws/bags/raw_20260312_024403
+#   bash scripts/dlio/reconstruct_raw.sh --tf-profile urdf-imu humble_ws/bags/raw_20260312_024403
 #   bash scripts/dlio/reconstruct_raw.sh humble_ws/bags/raw_20260312_024403 --rate 2.0
 
 set -eo pipefail
 
-BAG="${1:?Error: bag path required. Usage: $0 <bag_directory> [ros2 bag play args...]}"
-shift
-EXTRA_ARGS=("$@")
+TF_PROFILE=legacy
+BAG=""
+EXTRA_ARGS=()
+
+usage() {
+    sed -n "2,10p" "$0"
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --tf-profile)
+            TF_PROFILE="${2:?Error: --tf-profile requires a value}"
+            shift 2
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        --)
+            shift
+            if [ -z "$BAG" ]; then
+                echo "Error: bag path required before --." >&2
+                usage >&2
+                exit 2
+            fi
+            EXTRA_ARGS+=("$@")
+            break
+            ;;
+        *)
+            if [ -z "$BAG" ]; then
+                if [[ "$1" == -* ]]; then
+                    echo "Error: unknown option before bag path: $1" >&2
+                    usage >&2
+                    exit 2
+                fi
+                BAG="$1"
+            else
+                EXTRA_ARGS+=("$1")
+            fi
+            shift
+            ;;
+    esac
+done
+
+if [ -z "$BAG" ]; then
+    echo "Error: bag path required." >&2
+    usage >&2
+    exit 2
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 ROS_SETUP="/opt/ros/humble/setup.bash"
 RVIZ_CFG="$REPO_ROOT/config/dlio/dlio.rviz"
+DLIO_CONFIG=""
+DLIO_PARAMS_CONFIG=""
 WS_SETUP=""
 WS_SETUP_CANDIDATES=(
     "$REPO_ROOT/humble_ws/install/setup.bash"
     "$REPO_ROOT/.devcontainer/offline_dlio/install/setup.bash"
 )
+
+select_tf_profile() {
+    local cfg_dir="$REPO_ROOT/humble_ws/src/direct_lidar_inertial_odometry/cfg"
+
+    case "$TF_PROFILE" in
+        legacy)
+            DLIO_CONFIG="$cfg_dir/dlio.yaml"
+            DLIO_PARAMS_CONFIG="$cfg_dir/params.yaml"
+            ;;
+        urdf-imu)
+            DLIO_CONFIG="$cfg_dir/dlio_urdf_imu.yaml"
+            DLIO_PARAMS_CONFIG="$cfg_dir/params_urdf_imu.yaml"
+            ;;
+        *)
+            echo "Error: --tf-profile must be legacy or urdf-imu." >&2
+            exit 2
+            ;;
+    esac
+
+    for config in "$DLIO_CONFIG" "$DLIO_PARAMS_CONFIG"; do
+        if [ ! -f "$config" ]; then
+            echo "Error: TF profile config not found: $config" >&2
+            echo "Update submodules and rebuild the workspace, then rerun this script." >&2
+            exit 1
+        fi
+    done
+}
+
+select_tf_profile
 
 if [ ! -d "$BAG" ] && [ -d "$REPO_ROOT/$BAG" ]; then
     BAG="$REPO_ROOT/$BAG"
@@ -147,12 +224,17 @@ trap cleanup EXIT INT TERM
 echo "Bag:  $BAG"
 echo "RViz: $RVIZ_CFG"
 echo "D-LIO setup: $WS_SETUP"
+echo "TF profile: $TF_PROFILE"
+echo "D-LIO config: $DLIO_CONFIG"
+echo "Params config: $DLIO_PARAMS_CONFIG"
 echo "Mode: replay raw topics, run D-LIO offline, visualize generated outputs"
 echo ""
 
 setsid ros2 launch direct_lidar_inertial_odometry dlio.launch.py \
     rviz:=false \
     launch_drivers:=false \
+    dlio_config:="$DLIO_CONFIG" \
+    params_config:="$DLIO_PARAMS_CONFIG" \
     use_sim_time:=true \
     pointcloud_topic:=points_raw \
     imu_topic:=go2w/imu &
