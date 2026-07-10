@@ -12,6 +12,7 @@
 - [Quick start: Record D-LIO outputs (on robot)](#quick-start-record-d-lio-outputs-on-robot)
 - [Quick start: Record raw sensor data (on robot)](#quick-start-record-raw-sensor-data-on-robot)
 - [Quick start: Diagnose raw bag timestamps](#quick-start-diagnose-raw-bag-timestamps)
+- [Quick start: Sanity-check and clean LiDAR frames](#quick-start-sanity-check-and-clean-lidar-frames)
 - [Quick start: Replay D-LIO outputs (on robot or desktop)](#quick-start-replay-d-lio-outputs-on-robot-or-desktop)
 - [Quick start: Reconstruct D-LIO from raw bag (on robot or desktop)](#quick-start-reconstruct-d-lio-from-raw-bag-on-robot-or-desktop)
 - [Quick start: Diagnose TF (on desktop)](#quick-start-diagnose-tf-on-desktop)
@@ -174,6 +175,54 @@ The report includes:
 - Hesai `PointCloud2` per-point `timestamp` field checks used by D-LIO deskewing
 
 This is an observation tool, not a pass/fail gate. Use the output to decide whether the IMU and LiDAR streams overlap in time, whether IMU stamps are monotonic, and whether a fixed LiDAR/IMU time offset should be estimated before offline reconstruction.
+
+
+## Quick start: Sanity-check and clean LiDAR frames
+
+After `check_raw_bag_timestamps.py`, use the following tools to isolate bad LiDAR frames and create a sanitized copy of a raw bag.
+
+### 1) Locate LiDAR timestamp anomalies
+
+`scripts/diagnosis/locate_lidar_timestamp_anomalies.py` scans a raw bag for
+non-increasing/duplicate LiDAR frames, unusual per-frame delays, and IMU alignment
+outliers. It prints each flagged frame with nearby context so you can identify the
+exact frames to drop.
+
+```bash
+source /opt/ros/humble/setup.bash
+python3 scripts/diagnosis/locate_lidar_timestamp_anomalies.py /external/bags/raw_YYYYMMDD_HHMMSS
+```
+
+Optional JSON report:
+```bash
+python3 scripts/diagnosis/locate_lidar_timestamp_anomalies.py /external/bags/raw_YYYYMMDD_HHMMSS --json anomalies.json
+```
+
+### 2) Clean a raw bag by dropping bad LiDAR frames
+
+`scripts/dlio/clean_raw_bag_timestamps.py` writes a new rosbag2 directory and drops
+LiDAR frames flagged as anomalous (or optionally by delay/IMU-range policies).
+The source bag is never modified.
+
+```bash
+source /opt/ros/humble/setup.bash
+python3 scripts/dlio/clean_raw_bag_timestamps.py /external/bags/raw_YYYYMMDD_HHMMSS /external/bags/raw_YYYYMMDD_HHMMSS_clean
+```
+
+Useful options:
+- `--drop-record-delay-ms`: drop frames where `bag_time - header.stamp` is above a threshold.
+- `--drop-lidar-outside-imu-range`: drop frames outside IMU header time range.
+- `--keep-non-increasing`: keep non-increasing LiDAR header timestamps (off by default; they are dropped).
+- `--trim-start-sec`: drop all messages before a bag-time offset.
+- `--force`: overwrite output directory if it already exists.
+
+Optional machine-readable report:
+```bash
+python3 scripts/dlio/clean_raw_bag_timestamps.py /external/bags/raw_... /external/bags/raw_..._clean --json clean_report.json
+```
+
+Use the output summary to confirm dropped frame count before running
+`scripts/dlio/reconstruct_raw.sh` on the cleaned bag path.
 
 ## Quick start: Replay D-LIO outputs (on robot or desktop)
 
