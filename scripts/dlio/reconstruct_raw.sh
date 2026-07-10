@@ -2,10 +2,10 @@
 # Reconstruct D-LIO outputs from a raw sensor bag and open RViz2.
 #
 # Usage (from anywhere inside the repository):
-#   bash scripts/dlio/reconstruct_raw.sh [--tf-profile legacy|urdf-imu] <bag_directory> [ros2 bag play args...]
+#   bash scripts/dlio/reconstruct_raw.sh [--tf-profile legacy|urdf-imu|urdf-imu-lidar-legacy] <bag_directory> [ros2 bag play args...]
 #
 # Examples:
-#   bash scripts/dlio/reconstruct_raw.sh --tf-profile urdf-imu humble_ws/bags/raw_20260312_024403
+#   bash scripts/dlio/reconstruct_raw.sh --tf-profile urdf-imu-lidar-legacy humble_ws/bags/raw_20260312_024403
 #   bash scripts/dlio/reconstruct_raw.sh humble_ws/bags/raw_20260312_024403 --rate 2.0
 
 set -eo pipefail
@@ -84,8 +84,12 @@ select_tf_profile() {
             DLIO_CONFIG="$cfg_dir/dlio_urdf_imu.yaml"
             DLIO_PARAMS_CONFIG="$cfg_dir/params_urdf_imu.yaml"
             ;;
+        urdf-imu-lidar-legacy)
+            DLIO_CONFIG="$cfg_dir/dlio_urdf_imu_lidar_legacy.yaml"
+            DLIO_PARAMS_CONFIG="$cfg_dir/params_urdf_imu.yaml"
+            ;;
         *)
-            echo "Error: --tf-profile must be legacy or urdf-imu." >&2
+            echo "Error: --tf-profile must be legacy, urdf-imu, or urdf-imu-lidar-legacy." >&2
             exit 2
             ;;
     esac

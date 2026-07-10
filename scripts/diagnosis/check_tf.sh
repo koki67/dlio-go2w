@@ -2,7 +2,7 @@
 # Launch D-LIO TF visualization for validating GO2-W sensor extrinsics.
 #
 # Usage:
-#   bash scripts/diagnosis/check_tf.sh [--tf-profile legacy|urdf-imu] [--rviz false|true]
+#   bash scripts/diagnosis/check_tf.sh [--tf-profile legacy|urdf-imu|urdf-imu-lidar-legacy] [--rviz false|true]
 
 set -euo pipefail
 
@@ -54,8 +54,12 @@ select_tf_profile() {
             DLIO_CONFIG="$cfg_dir/dlio_urdf_imu.yaml"
             DLIO_PARAMS_CONFIG="$cfg_dir/params_urdf_imu.yaml"
             ;;
+        urdf-imu-lidar-legacy)
+            DLIO_CONFIG="$cfg_dir/dlio_urdf_imu_lidar_legacy.yaml"
+            DLIO_PARAMS_CONFIG="$cfg_dir/params_urdf_imu.yaml"
+            ;;
         *)
-            echo "Error: --tf-profile must be legacy or urdf-imu." >&2
+            echo "Error: --tf-profile must be legacy, urdf-imu, or urdf-imu-lidar-legacy." >&2
             exit 1
             ;;
     esac
@@ -85,7 +89,7 @@ while [ "$#" -gt 0 ]; do
             ;;
         *)
             echo "Error: unknown argument: $1" >&2
-            echo "Usage: bash scripts/diagnosis/check_tf.sh [--tf-profile legacy|urdf-imu] [--rviz false|true]" >&2
+            echo "Usage: bash scripts/diagnosis/check_tf.sh [--tf-profile legacy|urdf-imu|urdf-imu-lidar-legacy] [--rviz false|true]" >&2
             exit 1
             ;;
     esac
