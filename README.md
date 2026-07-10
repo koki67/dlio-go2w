@@ -7,15 +7,15 @@
 - [Submodules](#submodules)
 - [Setup](#setup)
 - [Bag types](#bag-types)
-- [Quick start: Online D-LIO (on robot)](#quick-start-online-d-lio-on-robot)
+- [Online D-LIO (robot)](#online-d-lio-robot)
   - [Desktop live RViz over WiFi](#desktop-live-rviz-over-wifi)
-- [Quick start: Record D-LIO outputs (on robot)](#quick-start-record-d-lio-outputs-on-robot)
-- [Quick start: Record raw sensor data (on robot)](#quick-start-record-raw-sensor-data-on-robot)
-- [Quick start: Diagnose raw bag timestamps](#quick-start-diagnose-raw-bag-timestamps)
-- [Quick start: Sanity-check and clean LiDAR frames](#quick-start-sanity-check-and-clean-lidar-frames)
-- [Quick start: Replay D-LIO outputs (on robot or desktop)](#quick-start-replay-d-lio-outputs-on-robot-or-desktop)
-- [Quick start: Reconstruct D-LIO from raw bag (on robot or desktop)](#quick-start-reconstruct-d-lio-from-raw-bag-on-robot-or-desktop)
-- [Quick start: Diagnose TF (on desktop)](#quick-start-diagnose-tf-on-desktop)
+- [Record D-LIO Outputs (robot)](#record-d-lio-outputs-robot)
+- [Record Raw Sensor Data (robot)](#record-raw-sensor-data-robot)
+- [Diagnose Raw Bag Timestamps](#diagnose-raw-bag-timestamps)
+- [Sanity-check and Clean LiDAR Frames](#sanity-check-and-clean-lidar-frames)
+- [Replay D-LIO Outputs (robot or desktop)](#replay-d-lio-outputs-robot-or-desktop)
+- [Reconstruct D-LIO From Raw Bag (robot or desktop)](#reconstruct-d-lio-from-raw-bag-robot-or-desktop)
+- [Diagnose TF (desktop)](#diagnose-tf-desktop)
 - [Catmux sessions](#catmux-sessions)
 - [License](#license)
 
@@ -106,7 +106,7 @@ This workspace distinguishes two types of bags with different use cases:
 
 Replaying a `dlio_` bag shows previously computed results. Reconstructing from a `raw_` bag re-runs D-LIO, which lets you change parameters and get updated outputs.
 
-## Quick start: Online D-LIO (on robot)
+## Online D-LIO (robot)
 
 Complete [Setup](#setup) first, then:
 
@@ -125,7 +125,7 @@ bash scripts/dlio/live_rviz.sh --iface enp97s0
 
 Replace `enp97s0` with the actual desktop interface on the same subnet as the robot.
 
-## Quick start: Record D-LIO outputs (on robot)
+## Record D-LIO Outputs (robot)
 
 Records the processed D-LIO topics for compact replay. No algorithm needed to replay this bag.
 
@@ -137,7 +137,7 @@ Recorded topics: `/dlio/odom_node/odom`, `/dlio/odom_node/path`, `/dlio/odom_nod
 
 Bags are saved to `/external/bags/dlio_YYYYMMDD_HHMMSS`.
 
-## Quick start: Record raw sensor data (on robot)
+## Record Raw Sensor Data (robot)
 
 Records `/go2w/imu` and `/points_raw` only. Use this when you want to re-run D-LIO with different parameters later.
 
@@ -147,7 +147,7 @@ catmux_create_session /external/catmux/record_raw.yaml
 
 Bags are saved to `/external/bags/raw_YYYYMMDD_HHMMSS`.
 
-## Quick start: Diagnose raw bag timestamps
+## Diagnose Raw Bag Timestamps
 
 Use this after recording a `raw_` bag to inspect whether the GO2-W IMU and Hesai LiDAR timestamps are usable for D-LIO. The script reads the rosbag2 files directly; it does not run `ros2 bag play`, start D-LIO, or open RViz.
 
@@ -176,8 +176,7 @@ The report includes:
 
 This is an observation tool, not a pass/fail gate. Use the output to decide whether the IMU and LiDAR streams overlap in time, whether IMU stamps are monotonic, and whether a fixed LiDAR/IMU time offset should be estimated before offline reconstruction.
 
-
-## Quick start: Sanity-check and clean LiDAR frames
+## Sanity-check and Clean LiDAR Frames
 
 After `check_raw_bag_timestamps.py`, use the following tools to isolate bad LiDAR frames and create a sanitized copy of a raw bag.
 
@@ -224,7 +223,7 @@ python3 scripts/dlio/clean_raw_bag_timestamps.py /external/bags/raw_... /externa
 Use the output summary to confirm dropped frame count before running
 `scripts/dlio/reconstruct_raw.sh` on the cleaned bag path.
 
-## Quick start: Replay D-LIO outputs (on robot or desktop)
+## Replay D-LIO Outputs (robot or desktop)
 
 **On robot** — edit the bag path in `catmux/playback_dlio.yaml`, then:
 ```bash
@@ -238,7 +237,7 @@ bash scripts/dlio/playback.sh bags/dlio_YYYYMMDD_HHMMSS
 
 RViz opens automatically. Close the window or press `Ctrl+C` to stop.
 
-## Quick start: Reconstruct D-LIO from raw bag (on robot or desktop)
+## Reconstruct D-LIO From Raw Bag (robot or desktop)
 
 Re-runs the D-LIO algorithm on a raw sensor bag and visualizes the outputs in real time.
 
@@ -252,7 +251,7 @@ catmux_create_session /external/catmux/reconstruct_raw_dlio.yaml
 bash scripts/dlio/reconstruct_raw.sh bags/raw_YYYYMMDD_HHMMSS
 ```
 
-## Quick start: Diagnose TF (on desktop)
+## Diagnose TF (desktop)
 
 `check_tf.sh` is a lightweight TF-only check for D-LIO frame alignment and extrinsics sanity.
 
