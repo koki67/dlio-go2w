@@ -3,6 +3,8 @@
 #
 # Usage:
 #   bash scripts/diagnosis/check_tf.sh [--tf-profile legacy|urdf-imu|urdf-imu-lidar-legacy] [--rviz false|true]
+#
+# Default TF profile: urdf-imu-lidar-legacy
 
 set -euo pipefail
 
@@ -10,7 +12,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 ROS_SETUP="/opt/ros/humble/setup.bash"
 RVIZ=true
-TF_PROFILE=legacy
+TF_PROFILE=urdf-imu-lidar-legacy
 DLIO_CONFIG=""
 DLIO_PARAMS_CONFIG=""
 WS_SETUP=""
@@ -47,16 +49,16 @@ select_tf_profile() {
 
     case "$TF_PROFILE" in
         legacy)
-            DLIO_CONFIG="$cfg_dir/dlio.yaml"
-            DLIO_PARAMS_CONFIG="$cfg_dir/params.yaml"
+            DLIO_CONFIG="$cfg_dir/dlio_legacy.yaml"
+            DLIO_PARAMS_CONFIG="$cfg_dir/params_legacy.yaml"
             ;;
         urdf-imu)
             DLIO_CONFIG="$cfg_dir/dlio_urdf_imu.yaml"
             DLIO_PARAMS_CONFIG="$cfg_dir/params_urdf_imu.yaml"
             ;;
         urdf-imu-lidar-legacy)
-            DLIO_CONFIG="$cfg_dir/dlio_urdf_imu_lidar_legacy.yaml"
-            DLIO_PARAMS_CONFIG="$cfg_dir/params_urdf_imu.yaml"
+            DLIO_CONFIG="$cfg_dir/dlio.yaml"
+            DLIO_PARAMS_CONFIG="$cfg_dir/params.yaml"
             ;;
         *)
             echo "Error: --tf-profile must be legacy, urdf-imu, or urdf-imu-lidar-legacy." >&2
@@ -84,7 +86,7 @@ while [ "$#" -gt 0 ]; do
             shift 2
             ;;
         -h|--help)
-            sed -n '2,6p' "$0"
+            sed -n '2,7p' "$0"
             exit 0
             ;;
         *)

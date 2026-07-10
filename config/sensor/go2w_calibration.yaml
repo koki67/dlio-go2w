@@ -11,7 +11,7 @@
 
 # --- Frame names ---
 frames:
-  imu: imu_link
+  imu: imu
   lidar: hesai_lidar
   base_link: base_link
   odom: odom
@@ -30,12 +30,11 @@ T_baselink_lidar:
   rotation_quaternion: [0.0, 0.0, 0.7071068, 0.7071068]  # [x, y, z, w]
 
 # --- Extrinsic calibration: base_link -> IMU ---
-# The Go2W IMU body frame is rotated +90 deg around Z from the robot body:
-#   IMU X = Robot Left, IMU Y = Robot Backward, IMU Z = Robot Up
-# Rz(+90) rotates IMU-frame vectors into base_link (REP-103).
+# The Go2W URDF defines the onboard IMU frame as `imu`. Its orientation is
+# aligned with base_link, and its position is offset from the robot body origin.
 T_baselink_imu:
-  translation: [0.0, 0.0, 0.0]
-  rotation_quaternion: [0.0, 0.0, 0.7071068, 0.7071068]  # [x, y, z, w]
+  translation: [-0.02557, 0.0, 0.04232]
+  rotation_quaternion: [0.0, 0.0, 0.0, 1.0]  # [x, y, z, w]
 
 # --- IMU noise parameters ---
 imu_noise:

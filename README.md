@@ -114,7 +114,7 @@ Complete [Setup](#setup) first, then:
 catmux_create_session /external/catmux/online_dlio.yaml
 ```
 
-This starts the IMU publisher, Hesai driver, and D-LIO node in a single tmux session. CycloneDDS is enabled on both `eth0` and `wlan0` (when available), so D-LIO topics are visible over WiFi from the desktop.
+This starts the IMU publisher, Hesai driver, and D-LIO node in a single tmux session. D-LIO uses the repository-standard Go2W TF by default: the URDF `imu` pose and the Hesai native-frame Rz(+90deg) LiDAR correction. CycloneDDS is enabled on both `eth0` and `wlan0` (when available), so D-LIO topics are visible over WiFi from the desktop.
 
 ### Desktop live RViz over WiFi
 
@@ -239,7 +239,7 @@ RViz opens automatically. Close the window or press `Ctrl+C` to stop.
 
 ## Reconstruct D-LIO From Raw Bag (robot or desktop)
 
-Re-runs the D-LIO algorithm on a raw sensor bag and visualizes the outputs in real time.
+Re-runs the D-LIO algorithm on a raw sensor bag and visualizes the outputs in real time. The default TF profile is the repository-standard Go2W profile, so no `--tf-profile` option is needed for normal runs.
 
 **On robot** — edit the bag path in `catmux/reconstruct_raw_dlio.yaml`, then:
 ```bash
@@ -255,9 +255,9 @@ bash scripts/dlio/reconstruct_raw.sh bags/raw_YYYYMMDD_HHMMSS
 
 `check_tf.sh` is a lightweight TF-only check for D-LIO frame alignment and extrinsics sanity.
 
-It launches two static transforms from `dlio.yaml` parameters:
-- `baselink` → `imu_link`
-- `baselink` → `hesai_lidar`
+It launches two static transforms from the standard `dlio.yaml` parameters:
+- `base_link` -> `imu` (URDF pose, orientation aligned with `base_link`)
+- `base_link` -> `hesai_lidar` (Hesai native-frame Rz(+90deg) correction)
 and optional RViz visualization (`direct_lidar_inertial_odometry` check_tf config) to inspect the TF tree, including `/tf` and `/tf_static`.
 
 Use it to catch broken/extrinsics-misconfigured calibrations before live runs.
@@ -269,6 +269,7 @@ bash scripts/diagnosis/check_tf.sh [--rviz false|true]
 Flags:
 - `--rviz true` (default): launch RViz for interactive frame inspection
 - `--rviz false`: headless mode for CLI-only checks
+- `--tf-profile legacy`: inspect the old pre-URDF-IMU profile
 
 ## Catmux sessions
 

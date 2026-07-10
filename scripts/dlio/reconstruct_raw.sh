@@ -4,18 +4,21 @@
 # Usage (from anywhere inside the repository):
 #   bash scripts/dlio/reconstruct_raw.sh [--tf-profile legacy|urdf-imu|urdf-imu-lidar-legacy] <bag_directory> [ros2 bag play args...]
 #
+# Default TF profile: urdf-imu-lidar-legacy
+#
 # Examples:
-#   bash scripts/dlio/reconstruct_raw.sh --tf-profile urdf-imu-lidar-legacy humble_ws/bags/raw_20260312_024403
+#   bash scripts/dlio/reconstruct_raw.sh humble_ws/bags/raw_20260312_024403
+#   bash scripts/dlio/reconstruct_raw.sh --tf-profile legacy humble_ws/bags/raw_20260312_024403
 #   bash scripts/dlio/reconstruct_raw.sh humble_ws/bags/raw_20260312_024403 --rate 2.0
 
 set -eo pipefail
 
-TF_PROFILE=legacy
+TF_PROFILE=urdf-imu-lidar-legacy
 BAG=""
 EXTRA_ARGS=()
 
 usage() {
-    sed -n "2,10p" "$0"
+    sed -n "2,12p" "$0"
 }
 
 while [ "$#" -gt 0 ]; do
@@ -77,16 +80,16 @@ select_tf_profile() {
 
     case "$TF_PROFILE" in
         legacy)
-            DLIO_CONFIG="$cfg_dir/dlio.yaml"
-            DLIO_PARAMS_CONFIG="$cfg_dir/params.yaml"
+            DLIO_CONFIG="$cfg_dir/dlio_legacy.yaml"
+            DLIO_PARAMS_CONFIG="$cfg_dir/params_legacy.yaml"
             ;;
         urdf-imu)
             DLIO_CONFIG="$cfg_dir/dlio_urdf_imu.yaml"
             DLIO_PARAMS_CONFIG="$cfg_dir/params_urdf_imu.yaml"
             ;;
         urdf-imu-lidar-legacy)
-            DLIO_CONFIG="$cfg_dir/dlio_urdf_imu_lidar_legacy.yaml"
-            DLIO_PARAMS_CONFIG="$cfg_dir/params_urdf_imu.yaml"
+            DLIO_CONFIG="$cfg_dir/dlio.yaml"
+            DLIO_PARAMS_CONFIG="$cfg_dir/params.yaml"
             ;;
         *)
             echo "Error: --tf-profile must be legacy, urdf-imu, or urdf-imu-lidar-legacy." >&2
