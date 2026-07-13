@@ -163,6 +163,26 @@ for t in info.get('topics_with_message_count', []):
 " "$BAG/metadata.yaml" 2>/dev/null) \
     || { echo "Error: failed to parse $BAG/metadata.yaml" >&2; exit 1; }
 
+bag_input_counts=$(python3 -c "
+import yaml, sys
+with open(sys.argv[1]) as f:
+    d = yaml.safe_load(f)
+info = d.get('rosbag2_bagfile_information', {})
+for t in info.get('topics_with_message_count', []):
+    m = t['topic_metadata']
+    if m['name'] in ('/points_raw', '/go2w/imu'):
+        print(f\"{m['name']}\t{t['message_count']}\")
+" "$BAG/metadata.yaml" 2>/dev/null) || { echo "Error: failed to read input message counts from $BAG/metadata.yaml" >&2; exit 1; }
+
+BAG_POINT_COUNT=""
+BAG_IMU_COUNT=""
+while IFS=$'\t' read -r topic count; do
+    case "$topic" in
+        /points_raw) BAG_POINT_COUNT="$count" ;;
+        /go2w/imu) BAG_IMU_COUNT="$count" ;;
+    esac
+done <<< "$bag_input_counts"
+
 for required in /points_raw /go2w/imu; do
     if ! grep -qxF "$required" <<< "$bag_topics"; then
         echo "Error: bag is missing required topic: $required" >&2
@@ -363,6 +383,7 @@ echo "Tuning profile: $TUNING_PROFILE"
 if [ -n "$TUNING_RUN_DIR" ]; then
     echo "Tuning manifest: $TUNING_RUN_DIR/manifest.yaml"
 fi
+echo "Expected D-LIO inputs: /points_raw=$BAG_POINT_COUNT, /go2w/imu=$BAG_IMU_COUNT"
 echo ""
 
 setsid ros2 launch direct_lidar_inertial_odometry dlio.launch.py \
@@ -371,27 +392,125 @@ setsid ros2 launch direct_lidar_inertial_odometry dlio.launch.py \
     dlio_config:="$DLIO_CONFIG" \
     params_config:="$DLIO_PARAMS_CONFIG" \
     use_sim_time:=true \
+    offline_replay:=true \
     pointcloud_topic:=points_raw \
     imu_topic:=go2w/imu &
 DLIO_PID=$!
 DLIO_PGID=$DLIO_PID
 
-sleep 3
-if ! kill -0 "$DLIO_PID" 2>/dev/null; then
-    echo "Error: D-LIO exited during startup." >&2
-    wait "$DLIO_PID" || true
+topic_has_subscriber() {
+    local topic="$1"
+    local info
+
+    if ! info="$(ros2 topic info "$topic" 2>/dev/null)"; then
+        return 1
+    fi
+
+    if grep -Eq "^Subscription count: [1-9][0-9]*$" <<< "$info"; then
+        return 0
+    fi
+    return 1
+}
+
+topic_has_publisher_and_subscriber() {
+    local topic="$1"
+    local info
+
+    if ! info="$(ros2 topic info "$topic" 2>/dev/null)"; then
+        return 1
+    fi
+
+    if ! grep -Eq "^Publisher count: [1-9][0-9]*$" <<< "$info"; then
+        return 1
+    fi
+    if grep -Eq "^Subscription count: [1-9][0-9]*$" <<< "$info"; then
+        return 0
+    fi
+    return 1
+}
+
+service_has_type() {
+    local service="$1"
+    local expected_type="$2"
+    local actual_type
+
+    if ! actual_type="$(ros2 service type "$service" 2>/dev/null)"; then
+        return 1
+    fi
+    [ "$actual_type" = "$expected_type" ]
+}
+
+wait_for_dlio_input_subscriptions() {
+    echo -n "Waiting for D-LIO input subscriptions..."
+    for _ in {1..50}; do
+        if ! kill -0 "$DLIO_PID" 2>/dev/null; then
+            echo " D-LIO exited." >&2
+            return 2
+        fi
+        if topic_has_subscriber /points_raw; then
+            if topic_has_subscriber /go2w/imu; then
+                echo " ready"
+                return 0
+            fi
+        fi
+        sleep 0.1
+    done
+
+    echo " timed out." >&2
+    return 1
+}
+
+wait_for_paused_bag_player() {
+    echo -n "Waiting for paused bag player connections..."
+    for _ in {1..50}; do
+        if ! kill -0 "$BAG_PID" 2>/dev/null; then
+            echo " player exited." >&2
+            return 2
+        fi
+        if service_has_type /rosbag2_player/resume rosbag2_interfaces/srv/Resume; then
+            if topic_has_publisher_and_subscriber /points_raw; then
+                if topic_has_publisher_and_subscriber /go2w/imu; then
+                    echo " ready"
+                    return 0
+                fi
+            fi
+        fi
+        sleep 0.1
+    done
+
+    echo " timed out." >&2
+    return 1
+}
+
+if ! wait_for_dlio_input_subscriptions; then
+    echo "Error: D-LIO input subscriptions did not become ready." >&2
+    if ! wait "$DLIO_PID" 2>/dev/null; then
+        :
+    fi
     exit 1
 fi
 
-# Reset D-LIO state before playback to clear any leftover data from previous runs.
-# timeout prevents hanging indefinitely if a node didn't come up cleanly.
-echo "Resetting D-LIO node state..."
-timeout 5 ros2 service call /dlio_odom_node/reset_map direct_lidar_inertial_odometry/srv/ResetMap || true
-timeout 5 ros2 service call /dlio_map_node/reset_map direct_lidar_inertial_odometry/srv/ResetMap || true
+# This is a fresh D-LIO process, so its state is already empty. Do not wait on
+# reset services here: they may not be available during node startup and each
+# timed-out call delays bag playback by five seconds.
 
-setsid ros2 bag play "$BAG" "${CLOCK_ARG[@]}" "${EXTRA_ARGS[@]}" &
+setsid ros2 bag play "$BAG" --start-paused --wait-for-all-acked 1000 "${CLOCK_ARG[@]}" "${EXTRA_ARGS[@]}" &
 BAG_PID=$!
 BAG_PGID=$BAG_PID
+
+if ! wait_for_paused_bag_player; then
+    echo "Error: paused bag player did not establish all input connections." >&2
+    exit 1
+fi
+
+# Resume only after the player publishers and D-LIO input subscriptions are
+# present. This keeps the first best-effort IMU messages from being emitted
+# while the endpoints are still being discovered.
+echo "Starting bag playback..."
+if ! ros2 service call /rosbag2_player/resume rosbag2_interfaces/srv/Resume "{}"; then
+    echo "Error: failed to resume the bag player." >&2
+    exit 1
+fi
 
 sleep 2
 if ! kill -0 "$BAG_PID" 2>/dev/null; then
