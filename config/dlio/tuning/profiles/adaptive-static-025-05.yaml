@@ -1,4 +1,4 @@
-name: adaptive-static-0.25-0.5
+name: adaptive-static-025-05
 description: Fixed approximation of adaptive behavior using its typical GICP correspondence and minimum keyframe-distance values.
 dlio:
   adaptive: false
