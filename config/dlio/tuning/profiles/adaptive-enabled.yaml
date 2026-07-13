@@ -1,0 +1,5 @@
+name: adaptive-enabled
+description: Re-enable the built-in adaptive keyframe and GICP correspondence heuristic.
+dlio:
+  adaptive: true
+params: {}

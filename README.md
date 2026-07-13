@@ -223,6 +223,66 @@ python3 scripts/dlio/clean_raw_bag_timestamps.py /external/bags/raw_... /externa
 Use the output summary to confirm dropped frame count before running
 `scripts/dlio/reconstruct_raw.sh` on the cleaned bag path.
 
+## Rebase a Manually Split Raw Bag for D-LIO
+
+When raw recording was deliberately stopped with `Ctrl+C` between rooms or
+buildings and the resulting bags were subsequently merged, the gap is real in
+both the IMU and LiDAR timelines. D-LIO integrates IMU time continuously, so a
+multi-second gap can make it jump at the join even though the merged rosbag is
+otherwise valid.
+
+`scripts/dlio/rebase_raw_bag_timestamps.py` creates a **new, D-LIO-input-only**
+bag with those long gaps compressed. It does not change the source bag. For
+every later segment it shifts the rosbag playback timestamp, the IMU header,
+the PointCloud2 header, and Hesai's absolute per-point `timestamp` field by
+the same amount. Updating all four is necessary to keep D-LIO deskewing
+consistent.
+
+Use this only when each manual stop represents unrecorded time and the robot
+was stationary (or was returned to the same pose) before recording resumed.
+It does not estimate the unrecorded motion; if the robot moved during a stop,
+reconstruct each segment separately and align the maps instead.
+
+First inspect the proposed split points without writing anything:
+
+```bash
+source /opt/ros/humble/setup.bash
+python3 scripts/dlio/rebase_raw_bag_timestamps.py \
+  bags/experiment_room1_room2_room3_merged \
+  --dry-run
+```
+
+Then create the derived bag and validate it before reconstruction:
+
+```bash
+python3 scripts/dlio/rebase_raw_bag_timestamps.py \
+  bags/experiment_room1_room2_room3_merged \
+  bags/experiment_room1_room2_room3_merged_dlio_rebased
+
+python3 scripts/diagnosis/check_raw_bag_timestamps.py \
+  bags/experiment_room1_room2_room3_merged_dlio_rebased
+
+python3 scripts/diagnosis/locate_lidar_timestamp_anomalies.py \
+  bags/experiment_room1_room2_room3_merged_dlio_rebased \
+  --imu-gap-threshold-ms 10
+
+bash scripts/dlio/reconstruct_raw.sh \
+  bags/experiment_room1_room2_room3_merged_dlio_rebased \
+  --topics /points_raw /go2w/imu --rate 1.0
+```
+
+The default policy treats a combined IMU/LiDAR header gap greater than one
+second as a recording boundary and leaves a 5 ms bridge. Customize it only
+when the diagnostics show a different natural boundary:
+
+- `--gap-threshold-sec`: gap that starts a new recording segment (default: `1.0`)
+- `--bridge-gap-ms`: smallest time left between segments in both header and bag time (default: `5.0`)
+- `--force`: replace an existing derived output bag
+- `--json report.json`: retain the detected boundaries and applied offsets for provenance
+
+The derived bag intentionally contains only `/go2w/imu` and `/points_raw`.
+Use the original merged bag for other topics or for provenance; keep the
+optional JSON report alongside the derived output.
 ## Replay D-LIO Outputs (robot or desktop)
 
 **On robot** — edit the bag path in `catmux/playback_dlio.yaml`, then:

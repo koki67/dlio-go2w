@@ -1,0 +1,5 @@
+name: baseline
+description: Fixed estimator baseline for manual D-LIO tuning comparisons.
+dlio:
+  adaptive: false
+params: {}
