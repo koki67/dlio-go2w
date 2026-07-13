@@ -2,7 +2,7 @@
 # Reconstruct D-LIO outputs from a raw sensor bag and open RViz2.
 #
 # Usage (from anywhere inside the repository):
-#   bash scripts/dlio/reconstruct_raw.sh [--tf-profile legacy|urdf-imu|urdf-imu-lidar-legacy] <bag_directory> [ros2 bag play args...]
+#   bash scripts/dlio/reconstruct_raw.sh [--tf-profile legacy|urdf-imu|urdf-imu-lidar-legacy] [--tuning-profile profile] <bag_directory> [ros2 bag play args...]
 #
 # Default TF profile: urdf-imu-lidar-legacy
 #
@@ -10,10 +10,14 @@
 #   bash scripts/dlio/reconstruct_raw.sh humble_ws/bags/raw_20260312_024403
 #   bash scripts/dlio/reconstruct_raw.sh --tf-profile legacy humble_ws/bags/raw_20260312_024403
 #   bash scripts/dlio/reconstruct_raw.sh humble_ws/bags/raw_20260312_024403 --rate 2.0
+#   bash scripts/dlio/reconstruct_raw.sh --tuning-profile baseline humble_ws/bags/raw_20260312_024403
 
 set -eo pipefail
 
 TF_PROFILE=urdf-imu-lidar-legacy
+TUNING_PROFILE=none
+TUNING_PROFILE_PATH=""
+TUNING_RUN_DIR=""
 BAG=""
 EXTRA_ARGS=()
 
@@ -25,6 +29,10 @@ while [ "$#" -gt 0 ]; do
     case "$1" in
         --tf-profile)
             TF_PROFILE="${2:?Error: --tf-profile requires a value}"
+            shift 2
+            ;;
+        --tuning-profile)
+            TUNING_PROFILE="${2:?Error: --tuning-profile requires a value}"
             shift 2
             ;;
         -h|--help)
@@ -108,6 +116,28 @@ select_tf_profile() {
 
 select_tf_profile
 
+select_tuning_profile() {
+    if [ "$TUNING_PROFILE" = "none" ]; then
+        return
+    fi
+
+    case "$TUNING_PROFILE" in
+        *[!A-Za-z0-9_-]*|'')
+            echo "Error: --tuning-profile must contain only letters, numbers, underscores, and hyphens." >&2
+            exit 2
+            ;;
+    esac
+
+    TUNING_PROFILE_PATH="$REPO_ROOT/config/dlio/tuning/profiles/$TUNING_PROFILE.yaml"
+    if [ ! -f "$TUNING_PROFILE_PATH" ]; then
+        echo "Error: tuning profile not found: $TUNING_PROFILE_PATH" >&2
+        echo "Available profiles are under: $REPO_ROOT/config/dlio/tuning/profiles" >&2
+        exit 1
+    fi
+}
+
+select_tuning_profile
+
 if [ ! -d "$BAG" ] && [ -d "$REPO_ROOT/$BAG" ]; then
     BAG="$REPO_ROOT/$BAG"
 fi
@@ -182,6 +212,98 @@ if ! ros2 pkg prefix direct_lidar_inertial_odometry >/dev/null 2>&1; then
     exit 1
 fi
 
+prepare_tuning_run() {
+    if [ "$TUNING_PROFILE" = "none" ]; then
+        return
+    fi
+
+    local bag_name
+    bag_name="$(basename "$BAG")"
+    TUNING_RUN_DIR="$REPO_ROOT/.dlio-tuning-runs/$bag_name/$TUNING_PROFILE-$(date -u +%Y%m%dT%H%M%SZ)"
+    mkdir -p "$TUNING_RUN_DIR"
+
+    if ! python3 - "$DLIO_CONFIG" "$DLIO_PARAMS_CONFIG" "$TUNING_PROFILE_PATH" "$TUNING_RUN_DIR" "$BAG" "${EXTRA_ARGS[@]}" <<'PY'
+import hashlib
+import pathlib
+import sys
+import yaml
+
+base_dlio, base_params, profile_path, run_dir, bag_path = sys.argv[1:6]
+replay_args = sys.argv[6:]
+run_path = pathlib.Path(run_dir)
+
+with open(profile_path) as f:
+    profile = yaml.safe_load(f) or {}
+if not isinstance(profile, dict):
+    raise SystemExit("tuning profile must be a YAML mapping")
+
+allowed = {"name", "description", "dlio", "params"}
+unknown = set(profile) - allowed
+if unknown:
+    raise SystemExit(f"unsupported tuning profile keys: {sorted(unknown)}")
+
+def overrides_for(section):
+    overrides = profile.get(section, {})
+    if not isinstance(overrides, dict):
+        raise SystemExit(f"{section} overrides must be a mapping")
+    return overrides
+
+def write_effective(base_path, overrides, output_name):
+    with open(base_path) as f:
+        config = yaml.safe_load(f) or {}
+    parameters = config.setdefault("/**", {}).setdefault("ros__parameters", {})
+    if not isinstance(parameters, dict):
+        raise SystemExit(f"invalid ros__parameters in {base_path}")
+    parameters.update(overrides)
+    output = run_path / output_name
+    with open(output, "w") as f:
+        yaml.safe_dump(config, f, sort_keys=False)
+    return output
+
+def sha256(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+effective_dlio = write_effective(base_dlio, overrides_for("dlio"), "effective-dlio.yaml")
+effective_params = write_effective(base_params, overrides_for("params"), "effective-params.yaml")
+
+with open(pathlib.Path(bag_path) / "metadata.yaml") as f:
+    bag_metadata = yaml.safe_load(f) or {}
+topics = bag_metadata.get("rosbag2_bagfile_information", {}).get("topics_with_message_count", [])
+counts = {
+    entry["topic_metadata"]["name"]: entry["message_count"]
+    for entry in topics
+    if entry["topic_metadata"]["name"] in {"/points_raw", "/go2w/imu"}
+}
+
+manifest = {
+    "profile": profile.get("name", pathlib.Path(profile_path).stem),
+    "description": profile.get("description", ""),
+    "profile_file": profile_path,
+    "bag": bag_path,
+    "expected_input_messages": counts,
+    "replay_arguments": replay_args,
+    "source_configs": {"dlio": base_dlio, "params": base_params},
+    "effective_configs": {
+        "dlio": {"path": str(effective_dlio), "sha256": sha256(effective_dlio)},
+        "params": {"path": str(effective_params), "sha256": sha256(effective_params)},
+    },
+}
+with open(run_path / "manifest.yaml", "w") as f:
+    yaml.safe_dump(manifest, f, sort_keys=False)
+PY
+    then
+        echo "Error: failed to prepare tuning profile: $TUNING_PROFILE" >&2
+        exit 1
+    fi
+
+    DLIO_CONFIG="$TUNING_RUN_DIR/effective-dlio.yaml"
+    DLIO_PARAMS_CONFIG="$TUNING_RUN_DIR/effective-params.yaml"
+}
+
 terminate_process_group() {
     local signal="$1"
     local pgid="${2:-}"
@@ -228,6 +350,8 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
+prepare_tuning_run
+
 echo "Bag:  $BAG"
 echo "RViz: $RVIZ_CFG"
 echo "D-LIO setup: $WS_SETUP"
@@ -235,6 +359,10 @@ echo "TF profile: $TF_PROFILE"
 echo "D-LIO config: $DLIO_CONFIG"
 echo "Params config: $DLIO_PARAMS_CONFIG"
 echo "Mode: replay raw topics, run D-LIO offline, visualize generated outputs"
+echo "Tuning profile: $TUNING_PROFILE"
+if [ -n "$TUNING_RUN_DIR" ]; then
+    echo "Tuning manifest: $TUNING_RUN_DIR/manifest.yaml"
+fi
 echo ""
 
 setsid ros2 launch direct_lidar_inertial_odometry dlio.launch.py \
