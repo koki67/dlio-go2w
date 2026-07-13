@@ -1,0 +1,7 @@
+name: adaptive-static-0.25-0.5
+description: Fixed approximation of adaptive behavior using its typical GICP correspondence and minimum keyframe-distance values.
+dlio:
+  adaptive: false
+params:
+  odom/gicp/maxCorrespondenceDistance: 0.25
+  odom/keyframe/threshD: 0.5
