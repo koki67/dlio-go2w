@@ -117,8 +117,8 @@ Visualization Manager:
           Class: rviz_default_plugins/PointCloud2
           Color: 0; 255; 0
           Color Transformer: AxisColor
-          Decay Time: 0
-          Enabled: true
+          Decay Time: 9999
+          Enabled: false
           Invert Rainbow: true
           Max Color: 255; 255; 255
           Max Intensity: 1024
@@ -128,44 +128,44 @@ Visualization Manager:
           Position Transformer: XYZ
           Queue Size: 10
           Selectable: true
-          Size (Pixels): 3
+          Size (Pixels): 1
           Size (m): 0.009999999776482582
           Style: Points
-          Topic: /map
+          Topic: /dlio/odom_node/pointcloud/deskewed
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
-          Value: true
+          Value: false
         - Alpha: 1
           Autocompute Intensity Bounds: false
           Autocompute Value Bounds:
             Max Value: 10
-            Min Value: 0
-            Value: false
+            Min Value: -10
+            Value: true
           Axis: Z
           Channel Name: intensity
           Class: rviz_default_plugins/PointCloud2
-          Color: 255; 255; 255
-          Color Transformer: Intensity
+          Color: 0; 255; 0
+          Color Transformer: AxisColor
           Decay Time: 0
-          Enabled: false
-          Invert Rainbow: false
+          Enabled: true
+          Invert Rainbow: true
           Max Color: 255; 255; 255
           Max Intensity: 1024
           Min Color: 0; 0; 0
           Min Intensity: 0
           Name: Sparse Map
           Position Transformer: XYZ
-          Queue Size: 1000
+          Queue Size: 1
           Selectable: true
-          Size (Pixels): 1
+          Size (Pixels): 2
           Size (m): 0.05000000074505806
           Style: Points
-          Topic: /dlio/map_node/map
+          Topic: /map
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
-          Value: false
+          Value: true
       Enabled: true
       Name: Point Clouds
     - Class: rviz_common/Group
