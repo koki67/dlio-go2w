@@ -311,6 +311,17 @@ catmux_create_session /external/catmux/reconstruct_raw_dlio.yaml
 bash scripts/dlio/reconstruct_raw.sh bags/raw_YYYYMMDD_HHMMSS
 ```
 
+The devcontainer mounts `/mnt/data1/experimental_data/go2w-experiment-recorder/bags` read-only at
+`/mnt/go2w-experiment-recorder/bags`, so raw bags can be reconstructed without
+copying them into this repository:
+
+```bash
+bash scripts/dlio/reconstruct_raw.sh /mnt/go2w-experiment-recorder/bags/raw_YYYYMMDD_HHMMSS
+```
+
+After pulling this configuration change, run **Dev Containers: Rebuild and
+Reopen in Container** once to apply the new mount.
+
 ## Diagnose TF (desktop)
 
 `check_tf.sh` is a lightweight TF-only check for D-LIO frame alignment and extrinsics sanity.

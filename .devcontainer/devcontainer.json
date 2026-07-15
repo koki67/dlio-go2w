@@ -22,7 +22,8 @@
 
   // Mount the host X11 socket so the container can open GUI windows.
   "mounts": [
-    "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind,consistency=cached"
+    "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind,consistency=cached",
+    "source=/mnt/data1/experimental_data/go2w-experiment-recorder/bags,target=/mnt/go2w-experiment-recorder/bags,type=bind,readonly"
   ],
 
   // Install desktop-only build dependencies and build the D-LIO package once.
