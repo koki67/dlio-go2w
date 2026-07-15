@@ -311,12 +311,16 @@ catmux_create_session /external/catmux/reconstruct_raw_dlio.yaml
 bash scripts/dlio/reconstruct_raw.sh bags/raw_YYYYMMDD_HHMMSS
 ```
 
-The devcontainer mounts `/mnt/data1/experimental_data/go2w-experiment-recorder/bags` read-only at
-`/mnt/go2w-experiment-recorder/bags`, so raw bags can be reconstructed without
-copying them into this repository:
+The devcontainer mounts these host bag directories read-only, so bags can be
+used without copying them into this repository:
+
+- `/mnt/data1/experimental_data/go2w-experiment-recorder/bags` at
+  `/mnt/go2w-experiment-recorder/bags`
+- `/mnt/data1/experimental_data/dlio-go2w/bags` at `/mnt/dlio-go2w/bags`
 
 ```bash
 bash scripts/dlio/reconstruct_raw.sh /mnt/go2w-experiment-recorder/bags/raw_YYYYMMDD_HHMMSS
+bash scripts/dlio/playback.sh /mnt/dlio-go2w/bags/dlio_YYYYMMDD_HHMMSS
 ```
 
 After pulling this configuration change, run **Dev Containers: Rebuild and
