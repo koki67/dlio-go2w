@@ -10,3 +10,6 @@ humble_ws/log/
 .devcontainer/offline_dlio/log/
 
 .dlio-tuning-runs/
+/results/dlio/
+__pycache__/
+*.pyc

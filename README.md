@@ -15,6 +15,7 @@
 - [Sanity-check and Clean LiDAR Frames](#sanity-check-and-clean-lidar-frames)
 - [Replay D-LIO Outputs (robot or desktop)](#replay-d-lio-outputs-robot-or-desktop)
 - [Reconstruct D-LIO From Raw Bag (robot or desktop)](#reconstruct-d-lio-from-raw-bag-robot-or-desktop)
+- [Headless Offline Processing and Saved Results](#headless-offline-processing-and-saved-results)
 - [Diagnose TF (desktop)](#diagnose-tf-desktop)
 - [Catmux sessions](#catmux-sessions)
 - [License](#license)
@@ -43,6 +44,7 @@ dlio-go2w/
 ├── .devcontainer/                       Desktop devcontainer (amd64, bag replay + reconstruction)
 ├── catmux/                              Robot-side tmux session definitions
 ├── scripts/dlio/                        Desktop offline scripts
+├── scripts/offline/                     Headless runs, analysis, and saved-result viewing
 ├── scripts/diagnosis/                   TF and timestamp validation helpers
 ├── config/
 │   ├── dlio/                            RViz config
@@ -200,17 +202,34 @@ python3 scripts/diagnosis/locate_lidar_timestamp_anomalies.py /external/bags/raw
 ### 2) Clean a raw bag by dropping bad LiDAR frames
 
 `scripts/dlio/clean_raw_bag_timestamps.py` writes a new rosbag2 directory and drops
-LiDAR frames flagged as anomalous (or optionally by delay/IMU-range policies).
-The source bag is never modified.
+LiDAR frames flagged as anomalous. By default it drops non-increasing LiDAR
+header timestamps; it can also inspect every Hesai per-point `timestamp` and
+drop a scan whose internal point-time range is inconsistent even when the scan
+header itself is monotonic. The source bag is never modified.
 
 ```bash
 source /opt/ros/humble/setup.bash
 python3 scripts/dlio/clean_raw_bag_timestamps.py /external/bags/raw_YYYYMMDD_HHMMSS /external/bags/raw_YYYYMMDD_HHMMSS_clean
 ```
 
+For the GO2-W Hesai recordings used by the offline artifact workflow, enable
+the per-point gate as well. A 200 ms threshold accepts the normal roughly
+100 ms scan span while rejecting delayed points several seconds outside the
+scan header:
+
+```bash
+python3 scripts/dlio/clean_raw_bag_timestamps.py \
+  /mnt/go2w-experiment-recorder/bags/experiment_... \
+  /mnt/dlio-go2w/results/derived-inputs/experiment_..._dlio_clean_points \
+  --drop-point-time-offset-ms 200 \
+  --json /mnt/dlio-go2w/results/derived-inputs/experiment_..._dlio_clean_points_report.json
+```
+
 Useful options:
 - `--drop-record-delay-ms`: drop frames where `bag_time - header.stamp` is above a threshold.
 - `--drop-lidar-outside-imu-range`: drop frames outside IMU header time range.
+- `--drop-point-time-offset-ms`: drop frames whose minimum or maximum per-point
+  timestamp differs from the PointCloud2 header by more than the threshold.
 - `--keep-non-increasing`: keep non-increasing LiDAR header timestamps (off by default; they are dropped).
 - `--trim-start-sec`: drop all messages before a bag-time offset.
 - `--force`: overwrite output directory if it already exists.
@@ -311,12 +330,13 @@ catmux_create_session /external/catmux/reconstruct_raw_dlio.yaml
 bash scripts/dlio/reconstruct_raw.sh bags/raw_YYYYMMDD_HHMMSS
 ```
 
-The devcontainer mounts these host bag directories read-only, so bags can be
-used without copying them into this repository:
+The devcontainer mounts these host bag directories read-only and the offline
+result directory read-write, so large artifacts remain outside the repository:
 
 - `/mnt/data1/experimental_data/go2w-experiment-recorder/bags` at
   `/mnt/go2w-experiment-recorder/bags`
 - `/mnt/data1/experimental_data/dlio-go2w/bags` at `/mnt/dlio-go2w/bags`
+- `/mnt/data1/experimental_data/dlio-go2w/results` at `/mnt/dlio-go2w/results`
 
 ```bash
 bash scripts/dlio/reconstruct_raw.sh /mnt/go2w-experiment-recorder/bags/raw_YYYYMMDD_HHMMSS
@@ -325,6 +345,41 @@ bash scripts/dlio/playback.sh /mnt/dlio-go2w/bags/dlio_YYYYMMDD_HHMMSS
 
 After pulling this configuration change, run **Dev Containers: Rebuild and
 Reopen in Container** once to apply the new mount.
+
+## Headless Offline Processing and Saved Results
+
+The reproducible offline workflow runs D-LIO once without RViz, records only
+its odometry and odom-frame deskewed scans, then creates and visualizes the
+completed map separately:
+
+```bash
+BAG=/mnt/go2w-experiment-recorder/bags/raw_YYYYMMDD_HHMMSS
+OUT="${DLIO_RESULTS_ROOT:-$PWD/results}/dlio/example/baseline"
+
+bash scripts/offline/run_dlio_offline.sh \
+  "$BAG" --rate 1.0 --output "$OUT"
+```
+
+The runner consumes only `/points_raw` and `/go2w/imu`, starts playback paused
+until all endpoints are ready, and generates `map_voxelized.pcd`,
+`map_preview.pcd`, `trajectory.csv`, `summary.json`, provenance snapshots,
+resource metrics, and a frozen two-topic result bag.
+
+Inspect the final result without rerunning D-LIO:
+
+```bash
+bash scripts/offline/visualize_dlio_run.sh "$OUT"
+```
+
+Replay the saved result as a growing map and path:
+
+```bash
+bash scripts/offline/visualize_dlio_run.sh "$OUT" --dynamic --rate 2.0
+```
+
+Neither visualization mode runs the LIO algorithm. See
+[the offline artifact workflow](docs/offline-result-artifacts.md) for the
+storage contract, validation, comparison, and troubleshooting details.
 
 ## Diagnose TF (desktop)
 

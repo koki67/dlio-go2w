@@ -13,7 +13,8 @@
     // Linux only — see README for macOS / Windows notes.
     "DISPLAY": "${localEnv:DISPLAY}",
     // Prevents Qt rendering artifacts in Docker.
-    "QT_X11_NO_MITSHM": "1"
+    "QT_X11_NO_MITSHM": "1",
+    "DLIO_RESULTS_ROOT": "/mnt/dlio-go2w/results"
   },
 
   // Host networking is the simplest way to let ros2 bag play and rviz2
@@ -24,7 +25,8 @@
   "mounts": [
     "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind,consistency=cached",
     "source=/mnt/data1/experimental_data/go2w-experiment-recorder/bags,target=/mnt/go2w-experiment-recorder/bags,type=bind,readonly",
-    "source=/mnt/data1/experimental_data/dlio-go2w/bags,target=/mnt/dlio-go2w/bags,type=bind,readonly"
+    "source=/mnt/data1/experimental_data/dlio-go2w/bags,target=/mnt/dlio-go2w/bags,type=bind,readonly",
+    "source=/mnt/data1/experimental_data/dlio-go2w/results,target=/mnt/dlio-go2w/results,type=bind"
   ],
 
   // Install desktop-only build dependencies and build the D-LIO package once.

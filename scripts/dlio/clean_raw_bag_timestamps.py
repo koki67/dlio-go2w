@@ -3,7 +3,8 @@
 
 The original bag is never modified. By default this script removes only LiDAR
 PointCloud2 messages whose header.stamp is non-increasing relative to the last
-kept LiDAR frame. This is intended for recorded GO2-W + Hesai raw bags where a
+kept LiDAR frame. An optional gate also checks the complete Hesai per-point
+timestamp range. This is intended for recorded GO2-W + Hesai raw bags where a
 single delayed/out-of-order point cloud can break offline D-LIO reconstruction.
 """
 
@@ -16,6 +17,8 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+import numpy as np
 
 try:
     import rosbag2_py
@@ -48,6 +51,7 @@ class DroppedFrame:
     bag_ns: int
     prev_kept_header_ns: int | None
     record_delay_ns: int
+    point_time_max_abs_offset_ms: float | None = None
     reasons: list[str] = field(default_factory=list)
 
 
@@ -79,6 +83,15 @@ def parse_args() -> argparse.Namespace:
         "--drop-lidar-outside-imu-range",
         action="store_true",
         help="Drop LiDAR frames whose header.stamp is outside the IMU header.stamp range.",
+    )
+    parser.add_argument(
+        "--drop-point-time-offset-ms",
+        type=float,
+        default=0.0,
+        help=(
+            "Drop LiDAR frames whose per-point timestamp range extends farther "
+            "than this many milliseconds from header.stamp. 0 disables it."
+        ),
     )
     parser.add_argument(
         "--keep-non-increasing",
@@ -214,6 +227,34 @@ def should_drop_lidar(
     return reasons
 
 
+def point_time_max_abs_offset_ms(msg: Any, header_ns: int) -> float | None:
+    field = next((field for field in msg.fields if field.name == "timestamp"), None)
+    if field is None:
+        return None
+    scalar_types = {
+        7: np.dtype(">f4" if msg.is_bigendian else "<f4"),
+        8: np.dtype(">f8" if msg.is_bigendian else "<f8"),
+    }
+    dtype = scalar_types.get(field.datatype)
+    if dtype is None or field.count != 1:
+        return None
+    values = np.ndarray(
+        shape=(msg.height, msg.width),
+        dtype=dtype,
+        buffer=msg.data,
+        offset=field.offset,
+        strides=(msg.row_step, msg.point_step),
+    ).reshape(-1)
+    values = values[np.isfinite(values)]
+    if values.size == 0:
+        return None
+    header_sec = header_ns / NSEC_PER_SEC
+    return max(
+        abs(float(values.min()) - header_sec),
+        abs(float(values.max()) - header_sec),
+    ) * 1000.0
+
+
 def clean_bag(input_bag: Path, output_bag: Path, info: BagInfo, args: argparse.Namespace) -> dict[str, Any]:
     reader = open_reader(input_bag)
     writer = open_writer(output_bag, info.topics)
@@ -252,6 +293,11 @@ def clean_bag(input_bag: Path, output_bag: Path, info: BagInfo, args: argparse.N
         header_ns = ns_from_msg_stamp(msg.header.stamp)
 
         reasons = should_drop_lidar(header_ns, bag_ns, last_kept_lidar_header_ns, info, args)
+        point_offset_ms = None
+        if args.drop_point_time_offset_ms > 0.0:
+            point_offset_ms = point_time_max_abs_offset_ms(msg, header_ns)
+            if point_offset_ms is not None and point_offset_ms > args.drop_point_time_offset_ms:
+                reasons.append("point_time_offset")
         if reasons:
             dropped_lidar.append(
                 DroppedFrame(
@@ -260,6 +306,7 @@ def clean_bag(input_bag: Path, output_bag: Path, info: BagInfo, args: argparse.N
                     bag_ns=bag_ns,
                     prev_kept_header_ns=last_kept_lidar_header_ns,
                     record_delay_ns=bag_ns - header_ns,
+                    point_time_max_abs_offset_ms=point_offset_ms,
                     reasons=reasons,
                 )
             )
@@ -292,6 +339,7 @@ def clean_bag(input_bag: Path, output_bag: Path, info: BagInfo, args: argparse.N
             "trim_start_sec": args.trim_start_sec,
             "drop_record_delay_ms": args.drop_record_delay_ms,
             "drop_lidar_outside_imu_range": args.drop_lidar_outside_imu_range,
+            "drop_point_time_offset_ms": args.drop_point_time_offset_ms,
             "keep_non_increasing": args.keep_non_increasing,
         },
         "dropped_lidar_frames": [
@@ -307,6 +355,7 @@ def clean_bag(input_bag: Path, output_bag: Path, info: BagInfo, args: argparse.N
                 else frame.prev_kept_header_ns / NSEC_PER_SEC,
                 "record_delay_ns": frame.record_delay_ns,
                 "record_delay_ms": frame.record_delay_ns / 1_000_000.0,
+                "point_time_max_abs_offset_ms": frame.point_time_max_abs_offset_ms,
                 "reasons": frame.reasons,
             }
             for frame in dropped_lidar
@@ -338,7 +387,10 @@ def print_report(report: dict[str, Any]) -> None:
         print("  none")
         return
 
-    print("   index          header_stamp    prev_kept_header      bag_time          delay  reasons")
+    print(
+        "   index          header_stamp    prev_kept_header      bag_time"
+        "          delay  point_offset  reasons"
+    )
     for frame in report["dropped_lidar_frames"]:
         reasons = ",".join(frame["reasons"])
         print(
@@ -347,6 +399,7 @@ def print_report(report: dict[str, Any]) -> None:
             f"{fmt_sec(frame['prev_kept_header_stamp_ns']):>20}  "
             f"{fmt_sec(frame['bag_time_ns']):>20}  "
             f"{fmt_ms(frame['record_delay_ns']):>12}  "
+            f"{frame['point_time_max_abs_offset_ms'] if frame['point_time_max_abs_offset_ms'] is not None else 'n/a':>12}  "
             f"{reasons}"
         )
 
